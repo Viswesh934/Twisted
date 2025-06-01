@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { translationLanguages } from './constants/translation';
+import { detectEmotion } from './api-handlers/detectEmotion'; // Import the detectEmotion function
 
 export default function TranslationComponent({ isOpen, onClose, onTranslated }) {
   const [sourceText, setSourceText] = useState('');
@@ -8,6 +9,7 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
   const [targetLanguage, setTargetLanguage] = useState('es-ES');
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState('');
+  const [detectedEmotion, setDetectedEmotion] = useState(null);
 
   const translateText = async () => {
     if (!sourceText.trim()) {
@@ -18,20 +20,24 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
     setIsTranslating(true);
     setError('');
 
-    const options = {
-      method: "POST",
-      url: "https://api.murf.ai/v1/text/translate",
-      headers: {
-        "api-key": import.meta.env.VITE_APP_KEY,
-        "Content-Type": "application/json",
-      },
-      data: {
-        targetLanguage: targetLanguage,
-        texts: [sourceText],
-      },
-    };
-
     try {
+      // Detect emotion before translating
+      const emotionResult = await detectEmotion(sourceText);
+      setDetectedEmotion(emotionResult);
+
+      const options = {
+        method: "POST",
+        url: "https://api.murf.ai/v1/text/translate",
+        headers: {
+          "api-key": import.meta.env.VITE_APP_KEY,
+          "Content-Type": "application/json",
+        },
+        data: {
+          targetLanguage: targetLanguage,
+          texts: [sourceText],
+        },
+      };
+
       const response = await axios.request(options);
       console.log('Translation response:', response.data);
 
@@ -40,7 +46,7 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
         setTranslatedText(translated);
 
         if (onTranslated) {
-          onTranslated(translated, targetLanguage);
+          onTranslated(translated, targetLanguage, emotionResult); // Pass the detected emotion
         }
       } else {
         setError('Translation failed. Please try again.');
@@ -57,11 +63,12 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
     setSourceText('');
     setTranslatedText('');
     setError('');
+    setDetectedEmotion(null);
   };
 
   const useTranslation = () => {
     if (translatedText && onTranslated) {
-      onTranslated(translatedText, targetLanguage);
+      onTranslated(translatedText, targetLanguage, detectedEmotion); // Pass the detected emotion
       onClose();
     }
   };
@@ -122,6 +129,18 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
               className="w-full h-24 sm:h-32 bg-black/30 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {/* Detected Emotion */}
+          {detectedEmotion && (
+            <div>
+              <label className="block text-sm font-medium mb-2 text-green-300">
+                Detected Emotion:
+              </label>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-100">
+                {detectedEmotion.emoji} {detectedEmotion.emotion} (Score: {detectedEmotion.sentiment_score})
+              </div>
+            </div>
+          )}
 
           {/* Translation Result */}
           {translatedText && (

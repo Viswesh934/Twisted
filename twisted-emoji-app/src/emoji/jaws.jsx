@@ -58,15 +58,22 @@ export default function TalkingEmojiApp() {
     if (!text.trim()) return;
 
     setIsLoading(true);
-    setIsAnalyzingEmotion(true);
+
+    // Only detect emotion for English text
+    if (selectedLanguage === 'en-US') {
+      setIsAnalyzingEmotion(true);
+      try {
+        const emotionResult = await detectEmotion(text);
+        setCurrentEmotion(emotionResult);
+      } catch (error) {
+        console.error('Error detecting emotion:', error);
+      } finally {
+        setIsAnalyzingEmotion(false);
+      }
+    }
 
     try {
-      // DETECT EMOTION FIRST
-      const emotionResult = await detectEmotion(text);
-      setCurrentEmotion(emotionResult);
-      setIsAnalyzingEmotion(false);
-
-      // Then proceed with speech generation
+      // Proceed with speech generation
       const apiUrl = import.meta.env.VITE_APP_URL;
       const apiKey = import.meta.env.VITE_APP_KEY;
 
@@ -129,13 +136,15 @@ export default function TalkingEmojiApp() {
     } catch (error) {
       console.error('Error:', error);
       setIsLoading(false);
-      setIsAnalyzingEmotion(false);
       fallbackToWebSpeech();
     }
   };
 
   // Real-time emotion detection on text change
   useEffect(() => {
+    // Only proceed if the selected language is English
+    if (selectedLanguage !== 'en-US') return;
+
     const debounceTimer = setTimeout(async () => {
       if (text.trim() && text.length > 10) {
         setIsAnalyzingEmotion(true);
@@ -146,7 +155,7 @@ export default function TalkingEmojiApp() {
     }, 1000);
 
     return () => clearTimeout(debounceTimer);
-  }, [text]);
+  }, [text, selectedLanguage]);
 
   // Fallback function for Web Speech API
   const fallbackToWebSpeech = () => {
@@ -213,7 +222,7 @@ export default function TalkingEmojiApp() {
     setText(sampleTexts[langCode] || sampleTexts.en);
   };
 
-  const handleTranslationResult = (translatedText, targetLanguage) => {
+  const handleTranslationResult = (translatedText, targetLanguage, detectedEmotion) => {
     setText(translatedText);
     // Optionally change the language to match the translation
     const lang = languages.find(l => l.code === targetLanguage);
@@ -222,6 +231,9 @@ export default function TalkingEmojiApp() {
       if (lang.voices.length > 0) {
         setSelectedVoice(lang.voices[0]);
       }
+    }
+    if (detectedEmotion) {
+      setCurrentEmotion(detectedEmotion);
     }
   };
 
