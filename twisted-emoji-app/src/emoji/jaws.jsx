@@ -4,15 +4,36 @@ import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import EnhancedCharacter from './character';
 
+// Add this function at the top of your TalkingEmojiApp component
+const detectEmotion = async (text) => {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_APP_EMOTION_API}/predict-emotion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text })
+    });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const emotionData = await response.json();
+    return emotionData;
+  } catch (error) {
+    console.error('Emotion detection error:', error);
+    return { emotion: 'neutral', emoji: '😐', sentiment_score: 0 };
+  }
+};
 
 // Simple 3D Character Component
-function Character({ isAnimating }) {
+function Character({ isAnimating, currentEmotion }) {
   const headRef = useRef();
   const jawRef = useRef();
   const leftEyeRef = useRef();
   const rightEyeRef = useRef();
-  
+
   useFrame((state) => {
     if (isAnimating && jawRef.current) {
       // Animate jaw movement for talking
@@ -22,12 +43,12 @@ function Character({ isAnimating }) {
       // Return jaw to closed position
       jawRef.current.rotation.x = THREE.MathUtils.lerp(jawRef.current.rotation.x, 0, 0.1);
     }
-    
+
     // Add subtle head bob
     if (headRef.current) {
       headRef.current.rotation.y = Math.sin(state.clock.getElapsedTime() * 0.5) * 0.1;
     }
-    
+
     // Eye blink animation
     if (leftEyeRef.current && rightEyeRef.current) {
       const blinkTime = Math.sin(state.clock.getElapsedTime() * 0.3);
@@ -48,7 +69,7 @@ function Character({ isAnimating }) {
         <sphereGeometry args={[1.2, 32, 32]} />
         <meshStandardMaterial color="#FFD700" />
       </mesh>
-      
+
       {/* Eyes */}
       <mesh ref={leftEyeRef} position={[-0.4, 0.3, 1]}>
         <sphereGeometry args={[0.15, 16, 16]} />
@@ -58,26 +79,26 @@ function Character({ isAnimating }) {
         <sphereGeometry args={[0.15, 16, 16]} />
         <meshStandardMaterial color="#000" />
       </mesh>
-      
+
       {/* Nose */}
       <mesh position={[0, 0, 1.1]}>
         <coneGeometry args={[0.1, 0.2, 8]} />
         <meshStandardMaterial color="#FFB347" />
       </mesh>
-      
+
       {/* Jaw */}
       <group ref={jawRef} position={[0, -0.3, 0]}>
         <mesh position={[0, -0.2, 0.8]}>
           <sphereGeometry args={[0.8, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color="#FFD700" />
         </mesh>
-        
+
         {/* Mouth */}
         <mesh position={[0, 0, 1]}>
           <sphereGeometry args={[0.3, 16, 8]} />
           <meshStandardMaterial color="#8B0000" />
         </mesh>
-        
+
         {/* Teeth */}
         <mesh position={[0, 0.1, 0.9]}>
           <boxGeometry args={[0.4, 0.1, 0.1]} />
@@ -89,16 +110,16 @@ function Character({ isAnimating }) {
 }
 
 // Scene Component
-function Scene({ isAnimating }) {
+function Scene({ isAnimating, currentEmotion }) {
   return (
     <>
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1} />
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
-      
-      <EnhancedCharacter isAnimating={isAnimating} />
-      
-      <OrbitControls 
+
+      <EnhancedCharacter isAnimating={isAnimating} currentEmotion={currentEmotion} />
+
+      <OrbitControls
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
@@ -117,68 +138,76 @@ export default function TalkingEmojiApp() {
   const [selectedVoice, setSelectedVoice] = useState('en-US-natalie');
   const [text, setText] = useState('Hello! This is a test of the talking emoji animation.');
   const [audioUrl, setAudioUrl] = useState(null);
-  
+
+  // ADD THESE NEW STATES FOR EMOTION
+  const [currentEmotion, setCurrentEmotion] = useState({
+    emotion: 'neutral',
+    emoji: '😐',
+    sentiment_score: 0
+  });
+  const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false);
+
   const audioRef = useRef(null);
-  
+
   // Language options with Murf AI voice IDs
   const languages = [
-    { 
-      code: 'en', 
-      name: 'English', 
+    {
+      code: 'en',
+      name: 'English',
       voices: [
         'en-US-natalie', 'en-US-aria', 'en-US-davis', 'en-US-guy',
         'en-GB-charlotte', 'en-AU-olivia', 'en-CA-clara'
-      ] 
+      ]
     },
-    { 
-      code: 'es', 
-      name: 'Español', 
-      voices: ['es-ES-alvaro', 'es-ES-elvira', 'es-MX-diego', 'es-AR-tomas'] 
+    {
+      code: 'es',
+      name: 'Español',
+      voices: ['es-ES-alvaro', 'es-ES-elvira', 'es-MX-diego', 'es-AR-tomas']
     },
-    { 
-      code: 'fr', 
-      name: 'Français', 
-      voices: ['fr-FR-alain', 'fr-FR-brigitte', 'fr-CA-felix', 'fr-FR-charlotte'] 
+    {
+      code: 'fr',
+      name: 'Français',
+      voices: ['fr-FR-alain', 'fr-FR-brigitte', 'fr-CA-felix', 'fr-FR-charlotte']
     },
-    { 
-      code: 'de', 
-      name: 'Deutsch', 
-      voices: ['de-DE-amala', 'de-DE-bernd', 'de-AT-jonas', 'de-CH-liam'] 
+    {
+      code: 'de',
+      name: 'Deutsch',
+      voices: ['de-DE-amala', 'de-DE-bernd', 'de-AT-jonas', 'de-CH-liam']
     },
-    { 
-      code: 'it', 
-      name: 'Italiano', 
-      voices: ['it-IT-benvenuto', 'it-IT-isabella', 'it-IT-giuseppe', 'it-IT-chiara'] 
+    {
+      code: 'it',
+      name: 'Italiano',
+      voices: ['it-IT-benvenuto', 'it-IT-isabella', 'it-IT-giuseppe', 'it-IT-chiara']
     },
-    { 
-      code: 'pt', 
-      name: 'Português', 
-      voices: ['pt-BR-antonio', 'pt-BR-francisca', 'pt-PT-tiago', 'pt-BR-camila'] 
+    {
+      code: 'pt',
+      name: 'Português',
+      voices: ['pt-BR-antonio', 'pt-BR-francisca', 'pt-PT-tiago', 'pt-BR-camila']
     },
-    { 
-      code: 'hi', 
-      name: 'हिन्दी', 
-      voices: ['hi-IN-aadhya', 'hi-IN-kiran', 'hi-IN-madhur', 'hi-IN-kavya'] 
+    {
+      code: 'hi',
+      name: 'हिन्दी',
+      voices: ['hi-IN-aadhya', 'hi-IN-kiran', 'hi-IN-madhur', 'hi-IN-kavya']
     },
-    { 
-      code: 'ja', 
-      name: '日本語', 
-      voices: ['ja-JP-ai', 'ja-JP-daichi', 'ja-JP-mayu', 'ja-JP-naoki'] 
+    {
+      code: 'ja',
+      name: '日本語',
+      voices: ['ja-JP-ai', 'ja-JP-daichi', 'ja-JP-mayu', 'ja-JP-naoki']
     },
-    { 
-      code: 'ko', 
-      name: '한국어', 
-      voices: ['ko-KR-bom', 'ko-KR-gook', 'ko-KR-nayeon', 'ko-KR-hyunsu'] 
+    {
+      code: 'ko',
+      name: '한국어',
+      voices: ['ko-KR-bom', 'ko-KR-gook', 'ko-KR-nayeon', 'ko-KR-hyunsu']
     },
-    { 
-      code: 'zh', 
-      name: '中文', 
-      voices: ['zh-CN-alex', 'zh-CN-lina', 'zh-TW-wayne', 'zh-HK-danny'] 
+    {
+      code: 'zh',
+      name: '中文',
+      voices: ['zh-CN-alex', 'zh-CN-lina', 'zh-TW-wayne', 'zh-HK-danny']
     }
   ];
-  
+
   const currentLanguage = languages.find(lang => lang.code === selectedLanguage);
-  
+
   // Sample texts for different languages
   const sampleTexts = {
     en: 'Hello! Welcome to our amazing talking emoji app. This is really cool!',
@@ -192,28 +221,32 @@ export default function TalkingEmojiApp() {
     ko: '안녕하세요! 놀라운 말하는 이모지 앱에 오신 것을 환영합니다.',
     zh: '你好！欢迎使用我们神奇的会说话的表情符号应用程序。'
   };
-  
+
   // Murf AI API integration
   const generateSpeech = async () => {
     if (!text.trim()) return;
-    
-    setIsLoading(true);
-    
-    try {
-      // Murf AI Stream API call
 
+    setIsLoading(true);
+    setIsAnalyzingEmotion(true);
+
+    try {
+      // DETECT EMOTION FIRST
+      const emotionResult = await detectEmotion(text);
+      setCurrentEmotion(emotionResult);
+      setIsAnalyzingEmotion(false);
+
+      // Then proceed with speech generation (your existing code)
       const apiUrl = import.meta.env.VITE_APP_URL;
-const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
-      
-      
+      const apiKey = import.meta.env.VITE_APP_KEY;
+
       const requestBody = {
         text: text,
         voiceId: selectedVoice,
-        format: "wav", // or "mp3"
-        sampleRate:  24000.0,
+        format: "wav",
+        sampleRate: 24000.0,
         bitRate: 320
       };
-      
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -222,85 +255,98 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
         },
         body: JSON.stringify(requestBody)
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      // Get audio blob from response
+
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       setAudioUrl(audioUrl);
-      
-      // Create and play audio
+
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      
+
       audio.onloadstart = () => {
         setIsLoading(true);
       };
-      
+
       audio.oncanplaythrough = () => {
         setIsLoading(false);
         setIsPlaying(true);
         audio.play();
       };
-      
+
       audio.onended = () => {
         setIsPlaying(false);
         URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
+        // Reset emotion to neutral after speaking
+        setTimeout(() => {
+          setCurrentEmotion({ emotion: 'neutral', emoji: '😐', sentiment_score: 0 });
+        }, 1000);
       };
-      
+
       audio.onerror = (error) => {
         console.error('Audio playback error:', error);
         setIsPlaying(false);
         setIsLoading(false);
         URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
-        
-        // Fallback to Web Speech API
         fallbackToWebSpeech();
       };
-      
+
     } catch (error) {
-      console.error('Murf AI API Error:', error);
+      console.error('Error:', error);
       setIsLoading(false);
-      
-      // Fallback to Web Speech API
+      setIsAnalyzingEmotion(false);
       fallbackToWebSpeech();
     }
   };
-  
+
+  // 4. Add real-time emotion detection on text change
+  useEffect(() => {
+    const debounceTimer = setTimeout(async () => {
+      if (text.trim() && text.length > 10) {
+        setIsAnalyzingEmotion(true);
+        const emotionResult = await detectEmotion(text);
+        setCurrentEmotion(emotionResult);
+        setIsAnalyzingEmotion(false);
+      }
+    }, 1000); // Wait 1 second after user stops typing
+
+    return () => clearTimeout(debounceTimer);
+  }, [text]);
+
   // Fallback function for Web Speech API
   const fallbackToWebSpeech = () => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = speechSynthesis.getVoices();
-      
+
       // Try to find a voice that matches the selected language
       const voice = voices.find(v => v.lang.startsWith(selectedLanguage)) || voices[0];
       if (voice) {
         utterance.voice = voice;
       }
-      
+
       utterance.rate = 0.9;
       utterance.pitch = 1.1;
-      
+
       utterance.onstart = () => {
         setIsPlaying(true);
         setIsLoading(false);
       };
-      
+
       utterance.onend = () => {
         setIsPlaying(false);
       };
-      
+
       utterance.onerror = () => {
         setIsPlaying(false);
         setIsLoading(false);
       };
-      
+
       speechSynthesis.speak(utterance);
     } else {
       // Final fallback: simulate speech duration
@@ -311,28 +357,28 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
       }, text.length * 50);
     }
   };
-  
+
   const stopSpeech = () => {
     // Stop Murf AI audio if playing
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    
+
     // Stop Web Speech API if active
     if ('speechSynthesis' in window) {
       speechSynthesis.cancel();
     }
-    
+
     // Clean up audio URL
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
     }
-    
+
     setIsPlaying(false);
   };
-  
+
   const handleLanguageChange = (langCode) => {
     setSelectedLanguage(langCode);
     const lang = languages.find(l => l.code === langCode);
@@ -341,17 +387,17 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
     }
     setText(sampleTexts[langCode] || sampleTexts.en);
   };
-  
+
   useEffect(() => {
     // Load voices when component mounts
     if ('speechSynthesis' in window) {
       const loadVoices = () => {
         speechSynthesis.getVoices();
       };
-      
+
       speechSynthesis.addEventListener('voiceschanged', loadVoices);
       loadVoices();
-      
+
       return () => {
         speechSynthesis.removeEventListener('voiceschanged', loadVoices);
       };
@@ -369,46 +415,92 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
           Powered by Murf AI & Three.js
         </p>
       </div>
-      
+
       {/* Main Content */}
       <div className="flex flex-col lg:flex-row gap-6 px-6 pb-6">
         {/* 3D Scene */}
-        <div className="flex-1  backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+        <div className="flex-1 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
           <div className="aspect-square w-full max-w-2xl mx-auto">
             <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
               <Suspense fallback={null}>
-                <Scene isAnimating={isPlaying} />
+                <Scene isAnimating={isPlaying} currentEmotion={currentEmotion} />
               </Suspense>
             </Canvas>
           </div>
-          
+
           {/* Status Indicator */}
-          <div className="text-center mt-4">
+          <div className="text-center mt-4 space-y-2">
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-              isPlaying ? 'bg-green-500/20 text-green-400' : 
-              isLoading ? 'bg-yellow-500/20 text-yellow-400' : 
+              isPlaying ? 'bg-green-500/20 text-green-400' :
+              isLoading ? 'bg-yellow-500/20 text-yellow-400' :
               'bg-gray-500/20 text-gray-400'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                isPlaying ? 'bg-green-400 animate-pulse' : 
-                isLoading ? 'bg-yellow-400 animate-spin' : 
+                isPlaying ? 'bg-green-400 animate-pulse' :
+                isLoading ? 'bg-yellow-400 animate-spin' :
                 'bg-gray-400'
               }`}></div>
               {isPlaying ? 'Speaking...' : isLoading ? 'Generating...' : 'Ready'}
             </div>
+
+            {/* EMOTION DISPLAY */}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+              isAnalyzingEmotion ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
+            }`}>
+              <span className="text-xl">{currentEmotion.emoji}</span>
+              <span className="capitalize font-medium">{currentEmotion.emotion}</span>
+              {isAnalyzingEmotion && <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>}
+            </div>
           </div>
         </div>
-        
+
         {/* Controls Panel */}
         <div className="lg:w-96 space-y-6">
+          {/* NEW: Emotion Analysis Panel */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+            <h3 className="text-xl font-semibold mb-4 text-yellow-300">Emotion Analysis</h3>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                <span>Current Emotion:</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{currentEmotion.emoji}</span>
+                  <span className="capitalize font-medium text-blue-300">{currentEmotion.emotion}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                <span>Intensity:</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-2 bg-gray-600 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-400 to-purple-500 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (currentEmotion.sentiment_score + 1) * 14)}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-sm text-gray-300">{currentEmotion.sentiment_score}/6</span>
+                </div>
+              </div>
+
+              {isAnalyzingEmotion && (
+                <div className="text-center py-2">
+                  <div className="inline-flex items-center gap-2 text-purple-400">
+                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                    Analyzing emotion...
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Language Selection */}
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
             <h3 className="text-xl font-semibold mb-4 text-yellow-300">Language & Voice</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-blue-200">Language</label>
-                <select 
+                <select
                   value={selectedLanguage}
                   onChange={(e) => handleLanguageChange(e.target.value)}
                   className="w-full bg-black/30 border border-white/30 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -420,10 +512,10 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-blue-200">Voice</label>
-                <select 
+                <select
                   value={selectedVoice}
                   onChange={(e) => setSelectedVoice(e.target.value)}
                   className="w-full bg-black/30 border border-white/30 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -437,18 +529,18 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
               </div>
             </div>
           </div>
-          
+
           {/* Text Input */}
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
             <h3 className="text-xl font-semibold mb-4 text-yellow-300">Text to Speech</h3>
-            
+
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Enter text to make the emoji speak..."
               className="w-full h-32 bg-black/30 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            
+
             <div className="flex gap-3 mt-4">
               <button
                 onClick={generateSpeech}
@@ -457,7 +549,7 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
               >
                 {isLoading ? 'Generating...' : isPlaying ? 'Speaking...' : '🎤 Speak'}
               </button>
-              
+
               {isPlaying && (
                 <button
                   onClick={stopSpeech}
@@ -468,11 +560,11 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
               )}
             </div>
           </div>
-          
+
           {/* Quick Samples */}
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
             <h3 className="text-xl font-semibold mb-4 text-yellow-300">Quick Samples</h3>
-            
+
             <div className="space-y-2">
               {Object.entries(sampleTexts).slice(0, 4).map(([code, sampleText]) => {
                 const lang = languages.find(l => l.code === code);
@@ -491,7 +583,7 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
               })}
             </div>
           </div>
-          
+
           {/* Instructions */}
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
             <h3 className="text-xl font-semibold mb-4 text-yellow-300">How to Use</h3>
@@ -501,17 +593,17 @@ const apiKey = import.meta.env.VITE_APP_KEY; // Replace with your actual API key
               <p>3. Click "Speak" to animate the emoji</p>
               <p>4. Use mouse to rotate and zoom the 3D scene</p>
             </div>
-            
+
             <div className="mt-4 p-3 bg-blue-500/20 rounded-lg border border-blue-400/30">
               <p className="text-xs text-blue-200">
-                <strong>Setup:</strong> Replace "YOUR_API_KEY" in the code with your actual Murf AI API key. 
+                <strong>Setup:</strong> Replace "YOUR_API_KEY" in the code with your actual Murf AI API key.
                 The app will fallback to Web Speech API if Murf API fails.
               </p>
             </div>
-            
+
             <div className="mt-2 p-3 bg-green-500/20 rounded-lg border border-green-400/30">
               <p className="text-xs text-green-200">
-                <strong>Features:</strong> Real-time streaming, 30+ premium voices, jaw sync animation, 
+                <strong>Features:</strong> Real-time streaming, 30+ premium voices, jaw sync animation,
                 multi-language support with automatic fallback.
               </p>
             </div>

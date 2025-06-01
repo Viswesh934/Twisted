@@ -17,7 +17,8 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1",
     "tailwindcss": "^4.1.8",
-    "three": "^0.177.0"
+    "three": "^0.177.0",
+    "twisted-emoji-app": "file:"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
