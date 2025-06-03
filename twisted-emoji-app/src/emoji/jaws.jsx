@@ -67,7 +67,7 @@ export default function TalkingEmojiApp() {
       setIsAnalyzingEmotion(false);
 
       // Then proceed with speech generation
-      const apiUrl = import.meta.env.VITE_APP_URL;
+      const apiUrl = `${import.meta.env.VITE_APP_URL}speech/stream`;
       const apiKey = import.meta.env.VITE_APP_KEY;
 
       const requestBody = {

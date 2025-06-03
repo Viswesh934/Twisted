@@ -11,6 +11,7 @@ export default function TranslationComponent({ isOpen, onClose, onTranslated }) 
   const [targetLanguage, setTargetLanguage] = useState('es-ES');
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState('');
+  const appUrl= `${import.meta.env.VITE_APP_URL}text/translate`
 
   const translateText = async () => {
     if (!sourceText.trim()) {
