@@ -72,9 +72,11 @@ export default function TalkingEmojiApp() {
       }
     }
 
+
+      const apiUrl = `${import.meta.env.VITE_APP_URL}speech/stream`;
+
     try {
-      // Proceed with speech generation
-      const apiUrl = import.meta.env.VITE_APP_URL;
+ 
       const apiKey = import.meta.env.VITE_APP_KEY;
 
       const requestBody = {

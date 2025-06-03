@@ -81,7 +81,7 @@ export const languages = [
       code: 'ja-JP',
       name: 'Japanese (Japan)',
       flag: '🇯🇵',
-      voices: ['ja-JP-ai', 'ja-JP-daichi', 'ja-JP-mayu', 'ja-JP-naoki']
+      voices: ['ja-JP-kenji', '	ja-JP-kimi', 'ja-JP-deniki']
     }
   ];
 
