@@ -39,7 +39,7 @@ export default function TalkingEmojiApp() {
   const [selectedVoice, setSelectedVoice] = useState('en-US-natalie');
   const [text, setText] = useState('Hello! This is a test of the talking emoji animation.');
   const [audioUrl, setAudioUrl] = useState(null);
-  const [activeTab, setActiveTab] = useState('speak'); // 'speak', 'samples', 'settings'
+  const [activeTab, setActiveTab] = useState('speak');
   const [isTranslatorOpen, setIsTranslatorOpen] = useState(false);
 
   // Emotion states
@@ -58,16 +58,25 @@ export default function TalkingEmojiApp() {
     if (!text.trim()) return;
 
     setIsLoading(true);
-    setIsAnalyzingEmotion(true);
+
+    // Only detect emotion for English text
+    if (selectedLanguage === 'en-US') {
+      setIsAnalyzingEmotion(true);
+      try {
+        const emotionResult = await detectEmotion(text);
+        setCurrentEmotion(emotionResult);
+      } catch (error) {
+        console.error('Error detecting emotion:', error);
+      } finally {
+        setIsAnalyzingEmotion(false);
+      }
+    }
+
+
+      const apiUrl = `${import.meta.env.VITE_APP_URL}speech/stream`;
 
     try {
-      // DETECT EMOTION FIRST
-      const emotionResult = await detectEmotion(text);
-      setCurrentEmotion(emotionResult);
-      setIsAnalyzingEmotion(false);
-
-      // Then proceed with speech generation
-      const apiUrl = `${import.meta.env.VITE_APP_URL}speech/stream`;
+ 
       const apiKey = import.meta.env.VITE_APP_KEY;
 
       const requestBody = {
@@ -129,13 +138,15 @@ export default function TalkingEmojiApp() {
     } catch (error) {
       console.error('Error:', error);
       setIsLoading(false);
-      setIsAnalyzingEmotion(false);
       fallbackToWebSpeech();
     }
   };
 
   // Real-time emotion detection on text change
   useEffect(() => {
+    // Only proceed if the selected language is English
+    if (selectedLanguage !== 'en-US') return;
+
     const debounceTimer = setTimeout(async () => {
       if (text.trim() && text.length > 10) {
         setIsAnalyzingEmotion(true);
@@ -146,7 +157,7 @@ export default function TalkingEmojiApp() {
     }, 1000);
 
     return () => clearTimeout(debounceTimer);
-  }, [text]);
+  }, [text, selectedLanguage]);
 
   // Fallback function for Web Speech API
   const fallbackToWebSpeech = () => {
@@ -213,7 +224,7 @@ export default function TalkingEmojiApp() {
     setText(sampleTexts[langCode] || sampleTexts.en);
   };
 
-  const handleTranslationResult = (translatedText, targetLanguage) => {
+  const handleTranslationResult = (translatedText, targetLanguage, detectedEmotion) => {
     setText(translatedText);
     // Optionally change the language to match the translation
     const lang = languages.find(l => l.code === targetLanguage);
@@ -222,6 +233,9 @@ export default function TalkingEmojiApp() {
       if (lang.voices.length > 0) {
         setSelectedVoice(lang.voices[0]);
       }
+    }
+    if (detectedEmotion) {
+      setCurrentEmotion(detectedEmotion);
     }
   };
 
@@ -253,10 +267,10 @@ export default function TalkingEmojiApp() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex gap-4 p-4 min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0">
         {/* 3D Scene - Left Side */}
-        <div className="flex-1 backdrop-blur-sm rounded-2xl p-4 border border-white/10 flex flex-col">
-          <div className="flex-1 w-full">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 backdrop-blur-sm rounded-2xl p-4 border border-white/10 w-full h-full">
             <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
               <Suspense fallback={null}>
                 <Scene isAnimating={isPlaying} currentEmotion={currentEmotion} />
@@ -290,7 +304,7 @@ export default function TalkingEmojiApp() {
         </div>
 
         {/* Controls Panel - Right Side */}
-        <div className="w-80 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 flex flex-col">
+        <div className="w-full md:w-80 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 flex flex-col">
           {/* Tab Navigation */}
           <div className="flex-shrink-0 flex bg-black/20 rounded-t-2xl">
             {[
@@ -302,8 +316,8 @@ export default function TalkingEmojiApp() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab.id 
-                    ? 'bg-blue-500/30 text-blue-300 border-b-2 border-blue-400' 
+                  activeTab === tab.id
+                    ? 'bg-blue-500/30 text-blue-300 border-b-2 border-blue-400'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
@@ -397,7 +411,7 @@ export default function TalkingEmojiApp() {
             {activeTab === 'settings' && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-yellow-300">Language & Voice</h3>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-blue-200">Language</label>
                   <select
@@ -429,7 +443,7 @@ export default function TalkingEmojiApp() {
                 </div>
 
                 <div className="pt-4 border-t border-white/20">
-                  <button 
+                  <button
                     onClick={() => setIsTranslatorOpen(true)}
                     className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 active:scale-95"
                   >
@@ -446,11 +460,15 @@ export default function TalkingEmojiApp() {
       </div>
 
       {/* Translation Component */}
-      <TranslationComponent 
-        isOpen={isTranslatorOpen}
-        onClose={() => setIsTranslatorOpen(false)}
-        onTranslated={handleTranslationResult}
-      />
+      {isTranslatorOpen && (
+        <div className="p-4">
+          <TranslationComponent
+            isOpen={isTranslatorOpen}
+            onClose={() => setIsTranslatorOpen(false)}
+            onTranslated={handleTranslationResult}
+          />
+        </div>
+      )}
     </div>
   );
 }
