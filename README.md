@@ -4,6 +4,7 @@
 A React application featuring a 3D animated emoji that speaks user input, detects emotional tone, and supports translation across languages.
 
 Find more about the architecture here: https://deepwiki.com/Viswesh934/Twisted
+Emotion-API: https://github.com/gyanavardhana/fastapi-emotion
 
 ---
 
@@ -133,5 +134,9 @@ URL: https://twisted-mu.vercel.app/
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+Contributors:
+Viswesh sigireddy
+Gyanavardhan mamidisetti
 
 
