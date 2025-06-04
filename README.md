@@ -1,5 +1,5 @@
 
-# 🎭 Twisted Emoji App
+# 🎭 Twisted Emoji App  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Viswesh934/Twisted)
 
 A React application featuring a 3D animated emoji that speaks user input, detects emotional tone, and supports translation across languages.
 
